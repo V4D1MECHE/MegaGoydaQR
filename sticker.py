@@ -23,8 +23,36 @@ tongue_path = os.path.join(os.path.dirname(__file__), "tongue.svg")
 with open(tongue_path, "rb") as f:
     tongue_base64 = base64.b64encode(f.read()).decode()
 
-# Функция для автоматического уменьшения размера шрифта
-def calculate_font_size(text, max_width=320, max_font_size=120, min_font_size=24):
+# Функция для разбивки текста на строки
+def split_text_to_lines(text, font_size, max_width=320):
+    words = text.split()
+    lines = []
+    current_line = []
+
+    # Примерная ширина символа для Gilroy Bold (~0.65 от размера шрифта)
+    avg_char_width = font_size * 0.65
+
+    for word in words:
+        test_line = ' '.join(current_line + [word])
+        test_width = len(test_line) * avg_char_width
+
+        if test_width <= max_width:
+            current_line.append(word)
+        else:
+            if current_line:
+                lines.append(' '.join(current_line))
+                current_line = [word]
+            else:
+                # Если одно слово не влезает, всё равно добавляем его
+                lines.append(word)
+
+    if current_line:
+        lines.append(' '.join(current_line))
+
+    return lines
+
+# Функция для автоматического уменьшения размера шрифта и разбивки на строки
+def calculate_font_size_and_lines(text, max_width=320, max_font_size=120, min_font_size=64):
     font_size = max_font_size
     # Примерная ширина символа для Gilroy Bold (~0.65 от размера шрифта)
     avg_char_width = font_size * 0.65
@@ -34,7 +62,14 @@ def calculate_font_size(text, max_width=320, max_font_size=120, min_font_size=24
         font_size = int((max_width / len(text)) / 0.65)
         font_size = max(font_size, min_font_size)
 
-    return font_size
+    # Проверяем, нужно ли разбивать на строки
+    final_width = len(text) * (font_size * 0.65)
+    if final_width > max_width:
+        # Разбиваем на строки с минимальным размером шрифта
+        lines = split_text_to_lines(text, min_font_size, max_width)
+        return min_font_size, lines
+    else:
+        return font_size, [text]
 
 # Конфигурация QR кода
 config = {
@@ -91,18 +126,22 @@ tongue_width = 303  # оригинальная ширина tongue.svg
 
 qr_size = sticker_width - (side_padding * 2)  # 320px
 
-# Вычисляем размер шрифта
-font_size = calculate_font_size(sticker_text)
+# Вычисляем размер шрифта и разбиваем текст на строки
+font_size, text_lines = calculate_font_size_and_lines(sticker_text)
+num_lines = len(text_lines)
+
+# Высота текстового блока (с учетом количества строк)
+text_block_height = font_size * num_lines
 
 # Высота белого фона
-white_bg_height = top_padding + text_top_padding + font_size + text_bottom_padding + text_block_to_line_padding + line_to_qr_padding + qr_size + bottom_padding
+white_bg_height = top_padding + text_top_padding + text_block_height + text_bottom_padding + text_block_to_line_padding + line_to_qr_padding + qr_size + bottom_padding
 
 # Автоматическая высота (белый фон + язычок)
 sticker_height = white_bg_height + tongue_height
 
 # Позиции элементов
 text_y = top_padding + text_top_padding  # верх текста (с dominant-baseline="hanging")
-text_block_end = text_y + font_size + text_bottom_padding  # конец текстового блока
+text_block_end = text_y + text_block_height + text_bottom_padding  # конец текстового блока
 line_y = text_block_end + text_block_to_line_padding  # линия после отступа
 qr_y = line_y + line_to_qr_padding
 qr_x = side_padding
@@ -114,6 +153,19 @@ tongue_y = white_bg_height
 # Координаты линии (от края до края с учетом отступов)
 line_x1 = side_padding
 line_x2 = sticker_width - side_padding
+
+# Генерация текстовых строк для SVG
+if num_lines == 1:
+    text_svg = f'  <text x="50%" y="{text_y}" text-anchor="middle" dominant-baseline="hanging"\n        font-family="Gilroy" font-size="{font_size}px" font-weight="bold" fill="black">\n    {text_lines[0]}\n  </text>'
+else:
+    tspan_lines = []
+    for i, line in enumerate(text_lines):
+        if i == 0:
+            tspan_lines.append(f'    <tspan x="50%" dy="0">{line}</tspan>')
+        else:
+            tspan_lines.append(f'    <tspan x="50%" dy="{font_size}">{line}</tspan>')
+
+    text_svg = f'  <text x="50%" y="{text_y}" text-anchor="middle" dominant-baseline="hanging"\n        font-family="Gilroy" font-size="{font_size}px" font-weight="bold" fill="black">\n' + '\n'.join(tspan_lines) + '\n  </text>'
 
 # Создание SVG вручную
 svg_content = f'''<svg width="{sticker_width}" height="{sticker_height}" viewBox="0 0 {sticker_width} {sticker_height}"
@@ -132,10 +184,7 @@ svg_content = f'''<svg width="{sticker_width}" height="{sticker_height}" viewBox
   <rect width="{sticker_width}" height="{white_bg_height}" rx="64" fill="white"/>
 
   <!-- Текст сверху -->
-  <text x="50%" y="{text_y}" text-anchor="middle" dominant-baseline="hanging"
-        font-family="Gilroy" font-size="{font_size}px" font-weight="bold" fill="black">
-    {sticker_text}
-  </text>
+{text_svg}
 
   <!-- Разделительная линия -->
   <line x1="{line_x1}" y1="{line_y}" x2="{line_x2}" y2="{line_y}" stroke="#E6E6E6" stroke-width="2"/>

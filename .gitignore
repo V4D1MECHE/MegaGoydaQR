@@ -23,3 +23,7 @@ txt.txt
 # IDE
 .vscode/
 .idea/
+
+# Hidden files
+.*
+!.gitignore
