@@ -1,0 +1,25 @@
+# SVG files
+*.svg
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Output files
+output/
+
+# Temporary files
+txt.txt
+*.tmp
+
+# Environment
+.env
+.venv
+
+# IDE
+.vscode/
+.idea/
